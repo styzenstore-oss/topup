@@ -1,10 +1,10 @@
 import crypto from "crypto";
 
 /**
- * Adapter payment gateway StenlyPay.
+ * Adapter payment gateway Stenly.
  *
  * !! CATATAN PENTING !!
- * Claude tidak menemukan dokumentasi API publik resmi dari stenlypay.id.
+ * Claude tidak menemukan dokumentasi API publik resmi dari stenly.d.
  * TAPI format key yang kamu kasih:
  *   sk_live_..., pk_live_..., whsec_...
  * itu PERSIS format penamaan Stripe (secret key, publishable key, webhook
@@ -15,18 +15,18 @@ import crypto from "crypto";
  * supaya besar kemungkinan langsung nyambung — tapi TETAP verifikasi ke
  * dashboard/dokumentasi StenlyPay kamu, terutama untuk:
  *   1. Path endpoint pastinya (saya asumsikan /v1/checkout/sessions)
- *   2. Nama header signature webhook (saya asumsikan "Stenlypay-Signature")
+ *   2. Nama header signature webhook (saya asumsikan "Stenly-Signature")
  *   3. Nama field response (payment_url/checkout_url, dsb — sudah saya
  *      buat fleksibel dengan beberapa fallback nama field)
  * Semua titik itu ditandai komentar TODO.
  */
 
-const BASE_URL = process.env.STENLYPAY_BASE_URL || "https://api.stenlypay.id";
-const SECRET_KEY = process.env.STENLYPAY_SECRET_KEY;
-const WEBHOOK_SECRET = process.env.STENLYPAY_WEBHOOK_SECRET;
+const BASE_URL = process.env.STENLY_BASE_URL || "https://api.stenly.id";
+const SECRET_KEY = process.env.STENLY_SECRET_KEY;
+const WEBHOOK_SECRET = process.env.STENLY_WEBHOOK_SECRET;
 
 /**
- * Membuat sesi pembayaran (checkout session) baru di StenlyPay.
+ * Membuat sesi pembayaran (checkout session) baru di Stenly
  * @param {object} params
  * @param {string} params.merchantRef ID unik order dari sistem kita
  * @param {number} params.amount total tagihan (Rupiah)
@@ -44,7 +44,7 @@ export async function createPaymentLink({
   productName,
 }) {
   // TODO: cocokkan path endpoint ini ("/v1/checkout/sessions") dengan
-  // dokumentasi asli StenlyPay begitu kamu dapat aksesnya.
+  // dokumentasi asli Stenly begitu kamu dapat aksesnya.
   const res = await fetch(`${BASE_URL}/v1/checkout/sessions`, {
     method: "POST",
     headers: {
@@ -64,14 +64,14 @@ export async function createPaymentLink({
       description: productName,
       success_url: `${process.env.NEXT_PUBLIC_SITE_URL}/riwayat`,
       cancel_url: `${process.env.NEXT_PUBLIC_SITE_URL}/riwayat`,
-      webhook_url: process.env.STENLYPAY_CALLBACK_URL,
+      webhook_url: process.env.STENLY_CALLBACK_URL,
     }),
   });
 
   const data = await res.json().catch(() => ({}));
 
   if (!res.ok) {
-    throw new Error(data?.message || data?.error?.message || "Gagal membuat sesi pembayaran StenlyPay");
+    throw new Error(data?.message || data?.error?.message || "Gagal membuat sesi pembayaran Stenly");
   }
 
   // Beberapa kemungkinan nama field response, disesuaikan begitu kamu tahu bentuk aslinya.
@@ -79,14 +79,14 @@ export async function createPaymentLink({
   const trxId = data.id || data.session_id || data.data?.id;
 
   if (!paymentUrl) {
-    throw new Error("Response StenlyPay tidak mengandung URL pembayaran — cek bentuk respons asli di lib/stenlypay.js");
+    throw new Error("Response Stenly tidak mengandung URL pembayaran — cek bentuk respons asli di lib/stenly.js");
   }
 
   return { paymentUrl, trxId, raw: data };
 }
 
 /**
- * Verifikasi signature webhook StenlyPay (pola Stripe-style).
+ * Verifikasi signature webhook Stenly (pola Stripe-style).
  * Header signature diasumsikan berformat: "t=<timestamp>,v1=<hex-hmac>"
  * dihitung dari HMAC-SHA256("<timestamp>.<raw body JSON>", WEBHOOK_SECRET).
  *
@@ -96,7 +96,7 @@ export async function createPaymentLink({
 export function verifyWebhookSignature(rawBody, signatureHeader) {
   if (!signatureHeader) return false;
 
-  // TODO: cek nama pemisah field di header asli StenlyPay — asumsi format
+  // TODO: cek nama pemisah field di header asli Stenly — asumsi format
   // Stripe: "t=1690000000,v1=abcdef123..."
   const parts = Object.fromEntries(
     signatureHeader.split(",").map((kv) => kv.trim().split("="))
@@ -118,7 +118,7 @@ export function verifyWebhookSignature(rawBody, signatureHeader) {
 }
 
 /**
- * Uraikan payload webhook StenlyPay setelah signature terverifikasi.
+ * Uraikan payload webhook Stenly setelah signature terverifikasi.
  * TODO: sesuaikan nama field status & jumlah sesuai dokumentasi asli.
  */
 export function parseWebhookPayload(payload) {
